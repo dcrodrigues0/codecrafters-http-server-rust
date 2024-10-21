@@ -33,7 +33,7 @@ fn handle_result(stream: TcpStream){
     let mut request_target: String = "".to_string();
     let mut http_version: String = "".to_string();
     
-    let mut req_props: HashMap<String,String> = HashMap::new();
+    let mut req_props: Vec<String> = Vec::new();
     for (i,line) in reader.lines().enumerate(){
         let req_line: String = line.unwrap();
 
@@ -43,14 +43,17 @@ fn handle_result(stream: TcpStream){
             request_target = req_info.next().unwrap().to_string();
             http_version = req_info.next().unwrap().to_string();
         }else{
-            //TODO Solve nullpointer here, cause headers.next().unwrap() will break when split terminator return None
-            let mut headers = req_line.split_terminator(':');
-            req_props.insert(headers.next().unwrap().to_string() , headers.next().unwrap().to_string());
+            let headers = req_line.split_whitespace();
+            for header in headers {
+                if !header.is_empty() && header.to_string() != ""{
+                    //TODO Understand how vectors works here in rust and also test it
+                    req_props.append(header.to_string());
+                }
+            }
         }
-
     }
 
-    println!("{:?}", req_props)
+    println!("teste {:?}", req_props);
 }
 
 
