@@ -1,8 +1,11 @@
-use std::io::{BufRead, BufReader};
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::io::{BufRead, BufReader, Read};
+use std::str::SplitWhitespace;
+use std::usize;
 use std::{io::Write, net::TcpStream};
 use std::net::TcpListener;
-
-
+use regex::Regex;
 
 fn main() {
     println!("Logs from your program will appear here!");
@@ -23,34 +26,86 @@ fn main() {
 }
 
 fn handle_result(stream: TcpStream){
-    let tmp_stream = stream.try_clone().unwrap();
-
-    let buff = 
-        BufReader::new(stream).lines().next().unwrap();
-
-    match buff {
-        Ok(str) =>{
-            let mut header_info = str.split_whitespace();
-            header_info.next();
-            let request_path = header_info.next().unwrap();
-
-            match request_path {
-                "/" => {
-                    write_result(tmp_stream, b"HTTP/1.1 200 OK\r\n\r\n");
-                }
-                _ => {
-                    write_result(tmp_stream, b"HTTP/1.1 404 Not Found\r\n\r\n");
+    let reader = 
+        BufReader::new(stream);
+    
+    for (i,line) in reader.lines().enumerate(){
+        let mut http_method: String = "".to_string();
+        let mut request_target: String = "".to_string();
+        let mut http_version: String = "".to_string();
+        let mut req_headers: HashMap<String,String> = HashMap::new();
+        let body: String;
+        
+        match i {
+            0 => {
+                let req_line: String = line.unwrap();
+                let mut req_props: SplitWhitespace<'_> = req_line.split_whitespace();
+                http_method = req_props.next().unwrap().to_string();
+                request_target = req_props.next().unwrap().to_string();
+                http_version = req_props.next().unwrap().to_string();
+            }
+            1 => {
+                let headers_line: String = line.unwrap();
+                let headers:SplitWhitespace<'_> = headers_line.split_whitespace();
+                for header in headers {
+                    let mut splitted_header = header.split_terminator(':');
+                    println!("{:?}", splitted_header.next().unwrap());
+                    // req_headers.insert(
+                    //     splitted_header.next().unwrap().to_string(),
+                    //     splitted_header.next().unwrap().to_string());
                 }
             }
-            println!("My URL Path: {:?}", str);
-            
+            // 2 => {handle_body(line.unwrap(), request)},
+            _=>{break;}
         }
-        Err(err ) => {
-            println!("Error {}", err);
-        }
-    }
+        println!("Line 1: {}, {}, {}", http_method, request_target, http_version);
+        println!("Line 2: {:?}", req_headers);
+        // println!("Line 3: {}, {}", http_method, request_target);
 
+    }
 }
+
+
+// fn handle_result(stream: TcpStream){
+//     let tmp_stream = stream.try_clone().unwrap();
+
+//     let buff = 
+//         BufReader::new(stream).lines().next().unwrap();
+
+//     match buff {
+//         Ok(str) =>{
+//             println!("req {}",str);
+//             let mut header_info: SplitWhitespace = str.split_whitespace();
+//             header_info.next();
+//             let request_path: &str = header_info.next().unwrap();
+//             let echo_path: Regex = Regex::new(r"^/echo/\w+$").unwrap();
+
+//             match request_path {
+//                 "/user-agent" => {
+//                     //TODO Refactor above logic to made a filter or something like it to find the route
+//                     write_result(tmp_stream, b"HTTP/1.1 200 OK\r\n\r\n");
+//                 }
+//                 rp if echo_path.is_match(rp) => {
+//                     let param = &rp[6..rp.chars().count()];
+//                     write_result(tmp_stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+//                         param.chars().count(),param).as_bytes());
+//                 }
+//                 "/" => {
+//                     write_result(tmp_stream, b"HTTP/1.1 200 OK\r\n\r\n");
+//                 }
+//                 _ => {
+//                     write_result(tmp_stream, b"HTTP/1.1 404 Not Found\r\n\r\n");
+//                 }
+//             }
+//             println!("My URL Path: {:?}", str);
+            
+//         }
+//         Err(err ) => {
+//             println!("Error {}", err);
+//         }
+//     }
+
+// }
 
 fn write_result(mut stream:TcpStream, string_buffer: &[u8]){
     let write_result 
