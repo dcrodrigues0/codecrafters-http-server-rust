@@ -28,41 +28,29 @@ fn main() {
 fn handle_result(stream: TcpStream){
     let reader = 
         BufReader::new(stream);
+
+    let mut http_method: String = "".to_string();
+    let mut request_target: String = "".to_string();
+    let mut http_version: String = "".to_string();
     
+    let mut req_props: HashMap<String,String> = HashMap::new();
     for (i,line) in reader.lines().enumerate(){
-        let mut http_method: String = "".to_string();
-        let mut request_target: String = "".to_string();
-        let mut http_version: String = "".to_string();
-        let mut req_headers: HashMap<String,String> = HashMap::new();
-        let body: String;
-        
-        match i {
-            0 => {
-                let req_line: String = line.unwrap();
-                let mut req_props: SplitWhitespace<'_> = req_line.split_whitespace();
-                http_method = req_props.next().unwrap().to_string();
-                request_target = req_props.next().unwrap().to_string();
-                http_version = req_props.next().unwrap().to_string();
-            }
-            1 => {
-                let headers_line: String = line.unwrap();
-                let headers:SplitWhitespace<'_> = headers_line.split_whitespace();
-                for header in headers {
-                    let mut splitted_header = header.split_terminator(':');
-                    println!("{:?}", splitted_header.next().unwrap());
-                    // req_headers.insert(
-                    //     splitted_header.next().unwrap().to_string(),
-                    //     splitted_header.next().unwrap().to_string());
-                }
-            }
-            // 2 => {handle_body(line.unwrap(), request)},
-            _=>{break;}
+        let req_line: String = line.unwrap();
+
+        if i == 0 {    
+            let mut req_info: SplitWhitespace<'_> = req_line.split_whitespace();
+            http_method = req_info.next().unwrap().to_string();
+            request_target = req_info.next().unwrap().to_string();
+            http_version = req_info.next().unwrap().to_string();
+        }else{
+            //TODO Solve nullpointer here, cause headers.next().unwrap() will break when split terminator return None
+            let mut headers = req_line.split_terminator(':');
+            req_props.insert(headers.next().unwrap().to_string() , headers.next().unwrap().to_string());
         }
-        println!("Line 1: {}, {}, {}", http_method, request_target, http_version);
-        println!("Line 2: {:?}", req_headers);
-        // println!("Line 3: {}, {}", http_method, request_target);
 
     }
+
+    println!("{:?}", req_props)
 }
 
 
