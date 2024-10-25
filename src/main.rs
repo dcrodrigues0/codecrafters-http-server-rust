@@ -46,8 +46,7 @@ fn handle_result(stream: TcpStream){
             let headers = req_line.split_whitespace();
             for header in headers {
                 if !header.is_empty() && header.to_string() != ""{
-                    //TODO Understand how vectors works here in rust and also test it
-                    req_props.append(header.to_string());
+                    req_props.push(header.to_string());
                 }
             }
         }
