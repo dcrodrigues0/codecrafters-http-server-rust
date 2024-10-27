@@ -15,7 +15,7 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                handle_result(stream);
+                handle_result(&stream);
                 println!("accepted new connection");
             }
             Err(e) => {
@@ -25,33 +25,41 @@ fn main() {
     }
 }
 
-fn handle_result(stream: TcpStream){
-    let reader = 
+fn handle_result(stream: &TcpStream){
+    let mut reader = 
         BufReader::new(stream);
 
     let mut http_method: String = "".to_string();
     let mut request_target: String = "".to_string();
     let mut http_version: String = "".to_string();
-    
     let mut req_props: Vec<String> = Vec::new();
-    for (i,line) in reader.lines().enumerate(){
-        let req_line: String = line.unwrap();
 
-        if i == 0 {    
-            let mut req_info: SplitWhitespace<'_> = req_line.split_whitespace();
-            http_method = req_info.next().unwrap().to_string();
-            request_target = req_info.next().unwrap().to_string();
-            http_version = req_info.next().unwrap().to_string();
-        }else{
-            let headers = req_line.split_whitespace();
-            for header in headers {
-                if !header.is_empty() && header.to_string() != ""{
-                    req_props.push(header.to_string());
+    let mut str = String::new();
+    reader.read_line(&mut str);
+
+    for (i, req_line) in str.split_whitespace().enumerate(){
+        match i {
+            0 => {
+                http_method = req_line.to_string();
+            }
+            1 => {
+                request_target = req_line.to_string();
+            }
+            2 => {
+                http_version = req_line.to_string();
+            }
+            _ =>{
+                let headers: SplitWhitespace<'_> = req_line.split_whitespace();
+                for header in headers {
+                    if !header.is_empty() && header.to_string() != ""{
+                        req_props.push(header.to_string());
+                    }
                 }
             }
         }
     }
 
+    write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n");
     println!("teste {:?}", req_props);
 }
 
@@ -97,7 +105,7 @@ fn handle_result(stream: TcpStream){
 
 // }
 
-fn write_result(mut stream:TcpStream, string_buffer: &[u8]){
+fn write_result(mut stream: &TcpStream, string_buffer: &[u8]){
     let write_result 
         = stream.write(string_buffer);
         
