@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::io::{BufRead, BufReader, Read};
 use std::str::SplitWhitespace;
+use std::time::Duration;
 use std::usize;
 use std::{io::Write, net::TcpStream};
 use std::net::TcpListener;
@@ -26,18 +27,16 @@ fn main() {
 }
 
 fn handle_result(stream: &TcpStream){
+    //TODO Do i need Block the TcpStream request?,if yes how and why
     let mut reader = 
         BufReader::new(stream);
 
+    //TODO Extract it for a specific method to get request_line maybe use tuple as return value
     let mut req_line: String = String::new();
-    let mut headers: String = String::new();
-    let mut body: String = String::new();
-
     let mut http_method: String = String::new();
     let mut req_target: String = String::new();
     let mut http_version: String = String::new();
-
-    //TODO Extract it for a specific method to get request_line
+    
     reader.read_line(&mut req_line);
     for (index, item ) in req_line.split_whitespace().enumerate(){
         match index {
@@ -48,11 +47,19 @@ fn handle_result(stream: &TcpStream){
         }
     }
 
-    //TODO Read headers and body
-    reader.read_line(&mut headers);
-    reader.read_line(&mut body);
+    let mut buf:String = String::new();
+    let mut req_props:Vec<String> = Vec::new();
+    for i in reader.lines(){
+        match i {
+            Ok(line) =>{
+                req_props.push(line.to_string());
+            },
+            Err(e) =>{println!("Não há resultados no reader")}
+        }
+    }
 
-    
+    println!("headers: {:?}", req_props);
+
     write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n");
 }
 
