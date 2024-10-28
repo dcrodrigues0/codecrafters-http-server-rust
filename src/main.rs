@@ -29,38 +29,31 @@ fn handle_result(stream: &TcpStream){
     let mut reader = 
         BufReader::new(stream);
 
-    let mut http_method: String = "".to_string();
-    let mut request_target: String = "".to_string();
-    let mut http_version: String = "".to_string();
-    let mut req_props: Vec<String> = Vec::new();
+    let mut req_line: String = String::new();
+    let mut headers: String = String::new();
+    let mut body: String = String::new();
 
-    let mut str = String::new();
-    reader.read_line(&mut str);
+    let mut http_method: String = String::new();
+    let mut req_target: String = String::new();
+    let mut http_version: String = String::new();
 
-    for (i, req_line) in str.split_whitespace().enumerate(){
-        match i {
-            0 => {
-                http_method = req_line.to_string();
-            }
-            1 => {
-                request_target = req_line.to_string();
-            }
-            2 => {
-                http_version = req_line.to_string();
-            }
-            _ =>{
-                let headers: SplitWhitespace<'_> = req_line.split_whitespace();
-                for header in headers {
-                    if !header.is_empty() && header.to_string() != ""{
-                        req_props.push(header.to_string());
-                    }
-                }
-            }
+    //TODO Extract it for a specific method to get request_line
+    reader.read_line(&mut req_line);
+    for (index, item ) in req_line.split_whitespace().enumerate(){
+        match index {
+            0 => http_method = item.to_string(),
+            1 => req_target = item.to_string(),
+            2 => http_version = item.to_string(),
+            _ => {} 
         }
     }
 
+    //TODO Read headers and body
+    reader.read_line(&mut headers);
+    reader.read_line(&mut body);
+
+    
     write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n");
-    println!("teste {:?}", req_props);
 }
 
 
