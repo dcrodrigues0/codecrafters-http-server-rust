@@ -16,7 +16,8 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                handle_result(&stream);
+                stream.set_read_timeout(Some(Duration::new(0, 1000))).expect("set_read_timeout call failed");
+                handle_result(stream);
                 println!("accepted new connection");
             }
             Err(e) => {
@@ -26,86 +27,39 @@ fn main() {
     }
 }
 
-fn handle_result(stream: &TcpStream){
-    //TODO Do i need Block the TcpStream request?,if yes how and why
-    let mut reader = 
-        BufReader::new(stream);
-
-    //TODO Extract it for a specific method to get request_line maybe use tuple as return value
-    let mut req_line: String = String::new();
-    let mut http_method: String = String::new();
-    let mut req_target: String = String::new();
-    let mut http_version: String = String::new();
-    
-    reader.read_line(&mut req_line);
-    for (index, item ) in req_line.split_whitespace().enumerate(){
-        match index {
-            0 => http_method = item.to_string(),
-            1 => req_target = item.to_string(),
-            2 => http_version = item.to_string(),
-            _ => {} 
-        }
-    }
-
+fn handle_result(mut stream: TcpStream){
     let mut buf:String = String::new();
-    let mut req_props:Vec<String> = Vec::new();
-    for i in reader.lines(){
-        match i {
-            Ok(line) =>{
-                req_props.push(line.to_string());
-            },
-            Err(e) =>{println!("Não há resultados no reader")}
-        }
+    stream.read_to_string(&mut buf);
+
+    let mut req_lines: SplitWhitespace<'_> = buf.split_whitespace();
+    
+    let req_method: &str = match req_lines.nth(0) {
+        Some(line) => line,
+        None => return
+    };
+    let req_target: &str = match req_lines.nth(0) {
+        Some(line) => line,
+        None => return
+    };
+    let http_version: &str = match req_lines.nth(0) {
+        Some(line) => line,
+        None => return
+    };
+    
+    //TODO Undertand why this shit is not taking the headers as should grrrrrr Maybe any is already consuming 1th of my lines
+    let mut headers: HashMap<&str, &str> = HashMap::new();
+    while req_lines.any(|line| !line.is_empty()){
+        headers.insert(req_lines.nth(0).unwrap(), req_lines.nth(0).unwrap());
     }
-
-    println!("headers: {:?}", req_props);
-
+    
+    println!("Req method: {:?} Req_target: {:?} Http_version: {:?}", req_method, req_target, http_version);
+    println!("headers: {:?}", headers);
     write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n");
 }
 
 
-// fn handle_result(stream: TcpStream){
-//     let tmp_stream = stream.try_clone().unwrap();
 
-//     let buff = 
-//         BufReader::new(stream).lines().next().unwrap();
-
-//     match buff {
-//         Ok(str) =>{
-//             println!("req {}",str);
-//             let mut header_info: SplitWhitespace = str.split_whitespace();
-//             header_info.next();
-//             let request_path: &str = header_info.next().unwrap();
-//             let echo_path: Regex = Regex::new(r"^/echo/\w+$").unwrap();
-
-//             match request_path {
-//                 "/user-agent" => {
-//                     //TODO Refactor above logic to made a filter or something like it to find the route
-//                     write_result(tmp_stream, b"HTTP/1.1 200 OK\r\n\r\n");
-//                 }
-//                 rp if echo_path.is_match(rp) => {
-//                     let param = &rp[6..rp.chars().count()];
-//                     write_result(tmp_stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
-//                         param.chars().count(),param).as_bytes());
-//                 }
-//                 "/" => {
-//                     write_result(tmp_stream, b"HTTP/1.1 200 OK\r\n\r\n");
-//                 }
-//                 _ => {
-//                     write_result(tmp_stream, b"HTTP/1.1 404 Not Found\r\n\r\n");
-//                 }
-//             }
-//             println!("My URL Path: {:?}", str);
-            
-//         }
-//         Err(err ) => {
-//             println!("Error {}", err);
-//         }
-//     }
-
-// }
-
-fn write_result(mut stream: &TcpStream, string_buffer: &[u8]){
+fn write_result(mut stream: TcpStream, string_buffer: &[u8]){
     let write_result 
         = stream.write(string_buffer);
         
