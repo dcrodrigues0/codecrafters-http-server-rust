@@ -53,15 +53,24 @@ fn handle_result(mut stream: TcpStream){
     let mut peek_req_lines: Peekable<_> = req_lines.peekable();
     let mut headers: HashMap<&str, &str> = HashMap::new();
     while peek_req_lines.peek().is_some() {       
-        headers.insert(peek_req_lines.next().unwrap_or(""), peek_req_lines.next().unwrap_or(""));
+        headers.insert(peek_req_lines.next().unwrap_or(""),
+         peek_req_lines.next().unwrap_or(""));
     }
     
-    println!("Req method: {:?} Req_target: {:?} Http_version: {:?}", req_method, req_target, http_version);
-    println!("headers: {:?}", headers);
-    write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n");
+    match req_target {
+        target if target.contains("/echo") && has_parameters(target) => write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n"),
+        "/" => write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n"),
+        _ => write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n")
+    }
+    
+    // write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n");
 }
 
-
+fn has_parameters(req_target:&str ) -> bool{
+    //TODO Think in a good way to rescue parameter values
+    req_target.split('/');
+    true
+}
 
 fn write_result(mut stream: TcpStream, string_buffer: &[u8]){
     let write_result 
