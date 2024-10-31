@@ -1,13 +1,10 @@
 use std::collections::HashMap;
-use std::hash::Hash;
-use std::io::{BufRead, BufReader, Read};
+use std::io::Read;
 use std::iter::Peekable;
 use std::str::SplitWhitespace;
 use std::time::Duration;
-use std::usize;
 use std::{io::Write, net::TcpStream};
 use std::net::TcpListener;
-use regex::Regex;
 
 fn main() {
     println!("Logs from your program will appear here!");
