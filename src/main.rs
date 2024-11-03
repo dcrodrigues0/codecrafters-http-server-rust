@@ -55,18 +55,23 @@ fn handle_result(mut stream: TcpStream){
     }
     
     match req_target {
-        target if target.contains("/echo") && has_parameters(target) => write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n"),
         "/" => write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n"),
+        target if target.contains("/echo/") && !get_parameter(target,String::from("echo")).is_empty() => 
+            exec_echo(stream, get_parameter(req_target, String::from("echo"))),
         _ => write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n")
     }
     
-    // write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n");
 }
 
-fn has_parameters(req_target:&str ) -> bool{
-    //TODO Think in a good way to rescue parameter values
-    req_target.split('/');
-    true
+fn exec_echo(stream: TcpStream, params: Vec<&str>){
+    let param: String = params[0].to_string();
+    write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+    param.chars().count(), param).as_bytes());
+}
+
+fn get_parameter(req_target:&str, endpoint:String) -> Vec<&str>{
+    req_target.split("/").filter(|str| !str.is_empty() && str.to_string() != endpoint)
+    .collect::<Vec<&str>>()
 }
 
 fn write_result(mut stream: TcpStream, string_buffer: &[u8]){
