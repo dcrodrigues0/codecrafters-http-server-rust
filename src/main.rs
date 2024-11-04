@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs::read_dir;
 use std::io::Read;
 use std::iter::Peekable;
 use std::str::SplitWhitespace;
@@ -57,12 +58,31 @@ fn handle_result(mut stream: TcpStream){
     
     match req_target {
         "/" => write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n"),
-        tg if tg.contains("/user-agent") => exec_user_agent(stream, headers),
+        "/user-agent" => exec_user_agent(stream, headers),
+        tg if tg.contains("/files") && !get_parameter(tg,String::from("files")).is_empty() => 
+            exec_files(stream, headers, get_parameter(tg,String::from("files"))),
         tg if tg.contains("/echo/") && !get_parameter(tg,String::from("echo")).is_empty() => 
             exec_echo(stream, get_parameter(req_target, String::from("echo"))),
         _ => write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n")
     }
     
+}
+
+fn exec_files(stream: TcpStream, headers: HashMap<String, String>, params: Vec<&str>){
+    if let Ok(entries) = read_dir("/tmp/"){
+        for entry in entries{
+            if let Ok(entry) = entry{
+                //TODO Finish this logic, and understand if tostringlossy is a viable way to implement it
+                if entry.file_name().to_string_lossy() == params[0].to_string(){
+                    
+                }
+
+                if let Ok(metadata) = entry.metadata(){
+                    println!("{:?}: {:?}", entry.path(), metadata.len());
+                }
+            }
+        }
+    }
 }
 
 fn exec_user_agent(stream: TcpStream, headers: HashMap<String, String>){
