@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fs::read_dir;
+use std::fs::{read_dir, read_to_string, DirEntry};
 use std::io::Read;
 use std::iter::Peekable;
 use std::str::SplitWhitespace;
@@ -60,7 +60,7 @@ fn handle_result(mut stream: TcpStream){
         "/" => write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n"),
         "/user-agent" => exec_user_agent(stream, headers),
         tg if tg.contains("/files") && !get_parameter(tg,String::from("files")).is_empty() => 
-            exec_files(stream, headers, get_parameter(tg,String::from("files"))),
+            exec_files(stream, get_parameter(tg,String::from("files"))),
         tg if tg.contains("/echo/") && !get_parameter(tg,String::from("echo")).is_empty() => 
             exec_echo(stream, get_parameter(req_target, String::from("echo"))),
         _ => write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n")
@@ -68,20 +68,29 @@ fn handle_result(mut stream: TcpStream){
     
 }
 
-fn exec_files(stream: TcpStream, headers: HashMap<String, String>, params: Vec<&str>){
+fn exec_files(stream: TcpStream, params: Vec<&str>){
     if let Ok(entries) = read_dir("/tmp/"){
         for entry in entries{
             if let Ok(entry) = entry{
-                //TODO Finish this logic, and understand if tostringlossy is a viable way to implement it
                 if entry.file_name().to_string_lossy() == params[0].to_string(){
-                    
-                }
-
-                if let Ok(metadata) = entry.metadata(){
-                    println!("{:?}: {:?}", entry.path(), metadata.len());
+                    if let Ok(metadata) = entry.metadata(){
+                        write_result(stream, 
+                            format!("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\n\r\n{}",
+                            metadata.len(), get_file_content(entry)).as_bytes());
+                        break;
+                    }   
                 }
             }
         }
+    }else{
+        write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n")
+    }
+}
+
+fn get_file_content(dir: DirEntry) -> String{
+    match read_to_string(dir.path()) {
+        Ok(file_content) => file_content,
+        Err(_) => String::new(),  
     }
 }
 
