@@ -77,14 +77,13 @@ fn exec_files(stream: TcpStream, params: Vec<&str>){
                         write_result(stream, 
                             format!("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\n\r\n{}",
                             metadata.len(), get_file_content(entry)).as_bytes());
-                        break;
+                        return;
                     }   
                 }
             }
         }
-    }else{
-        write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n")
     }
+    write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n");
 }
 
 fn get_file_content(dir: DirEntry) -> String{
