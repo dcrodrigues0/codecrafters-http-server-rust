@@ -90,7 +90,7 @@ fn post_exec_files(stream: TcpStream, headers: HashMap<String, String>){
 }
 
 fn is_header(request_info: &str) -> bool{
-    match request_info {
+    match request_info.strip_suffix(":").unwrap_or("") {
         "Host" => true,
         "User-Agent" => true,
         "Accept" => true,
