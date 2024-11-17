@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::format;
 use std::fs::{read_dir, read_to_string, DirEntry};
 use std::io::Read;
 use std::iter::Peekable;
@@ -36,7 +37,7 @@ fn handle_result(mut stream: TcpStream){
     }
 
     let mut req_lines: SplitWhitespace<'_> = buf.split_whitespace();
-    let _req_method: &str = match req_lines.nth(0) {
+    let req_method: &str = match req_lines.nth(0) {
         Some(line) => line,
         None => return
     };
@@ -55,20 +56,51 @@ fn handle_result(mut stream: TcpStream){
         headers.insert(peek_req_lines.next().unwrap_or("").to_string(),
          peek_req_lines.next().unwrap_or("").to_string());
     }
+
+    let req_body = headers.iter()
+        .filter(|(key, _value)| !is_header(key))
+        .map(|(key, value )| format!("{} {}", key, value))
+        .collect::<Vec<String>>();
     
-    match req_target {
-        "/" => write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n"),
-        "/user-agent" => exec_user_agent(stream, headers),
-        tg if tg.contains("/files") && !get_parameter(tg,String::from("files")).is_empty() => 
-            exec_files(stream, get_parameter(tg,String::from("files"))),
-        tg if tg.contains("/echo/") && !get_parameter(tg,String::from("echo")).is_empty() => 
-            exec_echo(stream, get_parameter(req_target, String::from("echo"))),
-        _ => write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n")
+    print!("My body: {:?}",req_body);
+    if req_method == "GET"{
+        match req_target {
+            "/" => {write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n"); return},
+            "/user-agent" => {exec_user_agent(stream, headers); return;},
+            tg if tg.contains("/files") && !get_parameter(tg,String::from("files")).is_empty() => 
+                {get_exec_files(stream, get_parameter(tg,String::from("files"))); return;},
+            tg if tg.contains("/echo/") && !get_parameter(tg,String::from("echo")).is_empty() => 
+                {exec_echo(stream, get_parameter(req_target, String::from("echo"))); return;},
+            _ => {write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n"); return;}
+        }
     }
     
+    if req_method == "POST"{
+        match req_target {    
+            tg if tg.contains("/files") && !get_parameter(tg,String::from("files")).is_empty() => 
+                post_exec_files(stream, headers),
+            _ => write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n")
+        }
+    }
+
 }
 
-fn exec_files(stream: TcpStream, params: Vec<&str>){
+fn post_exec_files(stream: TcpStream, headers: HashMap<String, String>){
+    write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n");
+}
+
+fn is_header(request_info: &str) -> bool{
+    match request_info {
+        "Host" => true,
+        "User-Agent" => true,
+        "Accept" => true,
+        "Content-Type" => true,
+        "Content-Length" => true,
+        _ => false   
+    }
+}
+
+fn get_exec_files(stream: TcpStream, params: Vec<&str>){
     if let Ok(entries) = read_dir("/tmp/"){
         for entry in entries{
             if let Ok(entry) = entry{
