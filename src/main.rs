@@ -1,6 +1,6 @@
+use core::str;
 use std::collections::HashMap;
-use std::fmt::format;
-use std::fs::{read_dir, read_to_string, DirEntry};
+use std::fs::{read_dir, read_to_string, DirEntry, File};
 use std::io::Read;
 use std::iter::Peekable;
 use std::str::SplitWhitespace;
@@ -52,17 +52,17 @@ fn handle_result(mut stream: TcpStream){
     
     let mut peek_req_lines: Peekable<_> = req_lines.peekable();
     let mut headers: HashMap<String, String> = HashMap::new();
-    while peek_req_lines.peek().is_some() {       
+    while peek_req_lines.peek().is_some() {
         headers.insert(peek_req_lines.next().unwrap_or("").to_string(),
          peek_req_lines.next().unwrap_or("").to_string());
     }
 
+    //TODO Organize the splitted words order
     let req_body = headers.iter()
         .filter(|(key, _value)| !is_header(key))
-        .map(|(key, value )| format!("{} {}", key, value))
-        .collect::<Vec<String>>();
-    
-    print!("My body: {:?}",req_body);
+        .map(|(key, value )| format!("{} {} ", key, value))
+        .collect::<String>();
+
     if req_method == "GET"{
         match req_target {
             "/" => {write_result(stream, b"HTTP/1.1 200 OK\r\n\r\n"); return},
@@ -78,15 +78,28 @@ fn handle_result(mut stream: TcpStream){
     if req_method == "POST"{
         match req_target {    
             tg if tg.contains("/files") && !get_parameter(tg,String::from("files")).is_empty() => 
-                post_exec_files(stream, headers),
+                post_exec_files(stream, req_target, req_body.as_ref()),
             _ => write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n")
         }
     }
 
 }
 
-fn post_exec_files(stream: TcpStream, headers: HashMap<String, String>){
-    write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n");
+fn post_exec_files(stream: TcpStream, target: &str, body: &str){
+    let file_name = get_parameter(target, String::from("files")).into_iter().collect::<String>();
+    println!("{:?}",file_name);
+    if let Ok(mut file) = File::create(format!("/tmp/{}", file_name)){
+        match file.write_all(body.as_bytes()) {
+            Ok(_) => {
+                write_result(stream, b"HTTP/1.1 201 Created\r\n\r\n");
+                print!("File writed!");
+            },
+            Err(e) => {
+                write_result(stream, b"HTTP/1.1 409 Conflict\r\n\r\n");
+                print!("File not writed! {:?}",e)
+            },
+        };
+    }
 }
 
 fn is_header(request_info: &str) -> bool{
