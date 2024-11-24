@@ -35,7 +35,9 @@ fn handle_result(mut stream: TcpStream){
         Ok(_) => return,
         Err(e) => println!("Stream read error: {:?}",e)
     }
-
+    //TODO Implement a way that don't use .clone
+    let buf_tmp = buf.clone();
+    
     let mut req_lines: SplitWhitespace<'_> = buf.split_whitespace();
     let req_method: &str = match req_lines.nth(0) {
         Some(line) => line,
@@ -50,13 +52,10 @@ fn handle_result(mut stream: TcpStream){
         None => return
     };
     
-    //TODO Strip ":" from headers
-    let mut peek_req_lines: Peekable<_> = req_lines.peekable();
-    let mut headers: HashMap<String, String> = HashMap::new();
-    while peek_req_lines.peek().is_some() {
-        headers.insert(peek_req_lines.next().unwrap_or("").to_string(),
-         peek_req_lines.next().unwrap_or("").to_string());
-    }
+    let headers: HashMap<String, String> = 
+        parse_header(buf_tmp.as_ref());
+
+    print!("Headers: {:?}",headers);
 
     //TODO Organize the splitted words order
     let req_body = headers.iter()
@@ -103,7 +102,7 @@ fn post_exec_files(stream: TcpStream, target: &str, body: &str){
 }
 
 fn is_header(request_info: &str) -> bool{
-    match request_info.strip_suffix(":").unwrap_or("") {
+    match request_info {
         "Host" => true,
         "User-Agent" => true,
         "Accept" => true,
@@ -112,6 +111,29 @@ fn is_header(request_info: &str) -> bool{
         "Accept-Encoding" => true,
         _ => false   
     }
+}
+
+fn parse_header(req_line: &str) -> HashMap<String,String>{
+    let mut headers: HashMap<String, String> = HashMap::new();
+    let mut lines = req_line.lines();
+
+    if let Some(_) = lines.next() {}
+
+    for line in lines{
+        if line.trim().is_empty(){
+            break;
+        }
+    
+        if let Some((key,value)) = line.split_once(':'){
+            if is_header(key){
+                headers.insert(
+                    key.trim().to_string(),
+                 value.trim().to_string());
+            }
+        }
+    }
+
+    headers
 }
 
 fn get_exec_files(stream: TcpStream, params: Vec<&str>){
