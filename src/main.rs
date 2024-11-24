@@ -50,6 +50,7 @@ fn handle_result(mut stream: TcpStream){
         None => return
     };
     
+    //TODO Strip ":" from headers
     let mut peek_req_lines: Peekable<_> = req_lines.peekable();
     let mut headers: HashMap<String, String> = HashMap::new();
     while peek_req_lines.peek().is_some() {
@@ -70,7 +71,7 @@ fn handle_result(mut stream: TcpStream){
             tg if tg.contains("/files") && !get_parameter(tg,String::from("files")).is_empty() => 
                 {get_exec_files(stream, get_parameter(tg,String::from("files"))); return;},
             tg if tg.contains("/echo/") && !get_parameter(tg,String::from("echo")).is_empty() => 
-                {exec_echo(stream, get_parameter(req_target, String::from("echo"))); return;},
+                {exec_echo(stream, get_parameter(req_target, String::from("echo")), headers); return;},
             _ => {write_result(stream, b"HTTP/1.1 404 Not Found\r\n\r\n"); return;}
         }
     }
@@ -87,7 +88,6 @@ fn handle_result(mut stream: TcpStream){
 
 fn post_exec_files(stream: TcpStream, target: &str, body: &str){
     let file_name = get_parameter(target, String::from("files")).into_iter().collect::<String>();
-    println!("{:?}",file_name);
     if let Ok(mut file) = File::create(format!("/tmp/{}", file_name)){
         match file.write_all(body.as_bytes()) {
             Ok(_) => {
@@ -109,6 +109,7 @@ fn is_header(request_info: &str) -> bool{
         "Accept" => true,
         "Content-Type" => true,
         "Content-Length" => true,
+        "Accept-Encoding" => true,
         _ => false   
     }
 }
@@ -145,8 +146,13 @@ fn exec_user_agent(stream: TcpStream, headers: HashMap<String, String>){
         user_agent.chars().count(), user_agent).as_bytes());
 }
 
-fn exec_echo(stream: TcpStream, params: Vec<&str>){
+fn exec_echo(stream: TcpStream, params: Vec<&str>, headers: HashMap<String, String>){
     let param: String = params[0].to_string();
+    if headers.contains_key("Accept-Encoding:"){
+        write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nContent-Encoding: {}\r\nContent-Length: {}\r\n\r\n{}",
+        headers.get("Accept-Encoding:").unwrap(), param.chars().count(), param).as_bytes());
+        return;
+    }
     write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
         param.chars().count(), param).as_bytes());
 }
