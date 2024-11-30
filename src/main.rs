@@ -2,8 +2,6 @@ use core::str;
 use std::collections::HashMap;
 use std::fs::{read_dir, read_to_string, DirEntry, File};
 use std::io::Read;
-use std::iter::Peekable;
-use std::str::SplitWhitespace;
 use std::time::Duration;
 use std::{io::Write, net::TcpStream};
 use std::net::TcpListener;
@@ -35,10 +33,8 @@ fn handle_result(mut stream: TcpStream){
         Ok(_) => return,
         Err(e) => println!("Stream read error: {:?}",e)
     }
-    //TODO Implement a way that don't use .clone
-    let buf_tmp = buf.clone();
     
-    let mut req_lines: SplitWhitespace<'_> = buf.split_whitespace();
+    let mut req_lines  = buf.split_whitespace();
     let req_method: &str = match req_lines.nth(0) {
         Some(line) => line,
         None => return
@@ -53,15 +49,11 @@ fn handle_result(mut stream: TcpStream){
     };
     
     let headers: HashMap<String, String> = 
-        parse_header(buf_tmp.as_ref());
+        parse_header(buf.as_ref());
 
-    print!("Headers: {:?}",headers);
-
-    //TODO Organize the splitted words order
-    let req_body = headers.iter()
-        .filter(|(key, _value)| !is_header(key))
-        .map(|(key, value )| format!("{} {} ", key, value))
-        .collect::<String>();
+    let req_body: String = buf.lines()
+        .skip(headers.len() + 1) //Skipping all headers and first line
+        .collect();
 
     if req_method == "GET"{
         match req_target {
@@ -114,6 +106,7 @@ fn is_header(request_info: &str) -> bool{
 }
 
 fn parse_header(req_line: &str) -> HashMap<String,String>{
+
     let mut headers: HashMap<String, String> = HashMap::new();
     let mut lines = req_line.lines();
 
@@ -162,21 +155,33 @@ fn get_file_content(dir: DirEntry) -> String{
 }
 
 fn exec_user_agent(stream: TcpStream, headers: HashMap<String, String>){
-    let or= &String::new();
-    let user_agent = headers.get("User-Agent:").unwrap_or(or);
-    write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+    if let Some(user_agent) = headers.get("User-Agent"){
+        write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
         user_agent.chars().count(), user_agent).as_bytes());
+    }
 }
 
 fn exec_echo(stream: TcpStream, params: Vec<&str>, headers: HashMap<String, String>){
     let param: String = params[0].to_string();
-    if headers.contains_key("Accept-Encoding:"){
-        write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nContent-Encoding: {}\r\nContent-Length: {}\r\n\r\n{}",
-        headers.get("Accept-Encoding:").unwrap(), param.chars().count(), param).as_bytes());
-        return;
+    //TODO Implement GZIP Support here
+    if let Some(client_encodings) = headers.get("Accept-Encoding"){
+        let valid_encodings= get_valid_encodings(client_encodings);
+        if !valid_encodings.is_empty(){
+            write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{}\r\n\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+            format!("Content-Encoding: {}", valid_encodings), param.chars().count(), param).as_bytes());
+            return;
+        }
     }
     write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
         param.chars().count(), param).as_bytes());
+}
+
+fn get_valid_encodings(encodings: &str) -> String{
+    println!("{:?}", encodings);
+    let server_accepted_encodings: String = encodings.split(',')
+    .filter(|encoding| encoding.to_string().trim().eq("gzip"))
+    .collect();
+    server_accepted_encodings.trim().to_string()
 }
 
 fn get_parameter(req_target:&str, endpoint:String) -> Vec<&str>{
