@@ -6,6 +6,9 @@ use std::time::Duration;
 use std::{io::Write, net::TcpStream};
 use std::net::TcpListener;
 
+use flate2::write::GzEncoder;
+use flate2::Compression;
+
 fn main() {
     println!("Logs from your program will appear here!");
 
@@ -162,18 +165,29 @@ fn exec_user_agent(stream: TcpStream, headers: HashMap<String, String>){
 }
 
 fn exec_echo(stream: TcpStream, params: Vec<&str>, headers: HashMap<String, String>){
-    let param: String = params[0].to_string();
-    //TODO Implement GZIP Support here
+    let param = params[0].as_bytes();
     if let Some(client_encodings) = headers.get("Accept-Encoding"){
         let valid_encodings= get_valid_encodings(client_encodings);
         if !valid_encodings.is_empty(){
-            write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{}\r\n\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
-            format!("Content-Encoding: {}", valid_encodings), param.chars().count(), param).as_bytes());
+            let mut compressed_data = Vec::new();
+            let mut encoder = GzEncoder::new( &mut compressed_data, Compression::default());
+            
+            if let Err(e) = encoder.write_all(param) {
+                println!("Failed to write data to GzEncoder: {:?}", e);
+                return;
+            }
+
+            if let Err(e) = encoder.finish() {
+                println!("Failed to finish compression: {:?}", e);
+                return;
+            }
+
+            write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n{}\r\n\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{:?}",
+            format!("Content-Encoding: {}", valid_encodings), param.len(), compressed_data).as_bytes());
             return;
         }
     }
-    write_result(stream, format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
-        param.chars().count(), param).as_bytes());
+    
 }
 
 fn get_valid_encodings(encodings: &str) -> String{
